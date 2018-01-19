@@ -3,46 +3,31 @@ var playlistModel=require('../models/modelPlaylist');
 var jwt=require('jsonwebtoken');
 var mongoose=require('mongoose');
 var number = require('./randomNumber');
+var passport = require("passport");
 var apiRoutesPlaylist = express.Router();
 
-apiRoutesPlaylist.use((req,res, next)=> {
-	var token=req.headers['authorization'];
-	if(token){
-		jwt.verify(token, req.app.get('superSecret'), (err, decoded)=>{
-			if(err){
-				return res.json({
-					success:false,
-					message:"Token is invalid"
-				})
-			}else{
-				req.decoded=decoded;
-				next();
-			}
-		});
-	}else{
-		res.status(403).json({
-			message:"Not exist token"
-		})
-	}
-})
 
-apiRoutesPlaylist.post("/playlist", (req,res)=>{
-	var token=req.headers['authorization'];
-	var tokenDecode=jwt.decode(token);
-	var userId=tokenDecode.user.data.attributes.userId;
+apiRoutesPlaylist.post("/playlist", passport.authenticate('jwt', {session:false}), (req,res)=>{
+	if(req.body.attributes.thumbnail==""){
+		var thumbnail ="https://tophinhanhdep.net/wp-content/uploads/2015/12/anh-dep-mua-xuan-3.jpg"
+	}else{
+		thumbnail=req.body.attributes.thumbnail
+	}
+	var userId=req.user.attributes.userId;
 	var playlist={
-		data:{
-			types:'Playlist',
+			types:"Playlist",
 			attributes:{
-				playlistId:number.random(100000,999999),
-				name:req.body.name,
-				description:req.body.description,
-				thumbnail:req.body.thumbnail,
-				userId:userId
+				playlistId:number.random(10000000,99999999),
+				name:req.body.attributes.name,
+				description:req.body.attributes.description,
+				thumbnail:thumbnail,
+				userId:userId,
+				createdAt:Date.now(),
+				updatedAt:Date.now(),
+				status:1
 			}
-		}
 	};
-	if(req.body.name==null||req.body.name==undefined||req.body.name.length<7||req.body.name==0){
+	if(req.body.attributes.name==null||req.body.attributes.name==undefined||req.body.attributes.name.length<7||req.body.attributes.name.length==0){
 		res.status(401).json({
 			message:"Playlist name must be larger than 7 character"
 		})
@@ -59,28 +44,42 @@ apiRoutesPlaylist.post("/playlist", (req,res)=>{
 	})
 })
 
-apiRoutesPlaylist.get("/playlist", (req,res)=>{
-	var token=req.headers['authorization'];
-	var tokenDecode=jwt.decode(token);
-	var userId=tokenDecode.user.data.attributes.userId;
-	playlistModel.find({'data.attributes.userId':userId}, (err, result)=>{
+apiRoutesPlaylist.get("/playlist", passport.authenticate('jwt', {session:false}), (req,res)=>{
+	var limit=req.query.maxResult;
+	var page=req.query.page;
+	var userId=req.user.attributes.userId;
+	if(limit==undefined||limit==null){
+		limit=10;
+	}
+	if(page==undefined||page==null){
+		page=1;
+	}
+	var totalPlaylist=0;
+	playlistModel.count({'attributes.userId':userId}, function(err, count){
+		totalPlaylist=count;
+	});
+	playlistModel.find({'attributes.userId':userId})
+	.limit(parseInt(limit))
+	.skip(parseInt((page-1)*limit))
+	.sort({"attributes.createdAt":1}).exec((err, result)=>{
 		if(err){
 			res.status(500).json({
 				message:"Server error"
 			});
 		}else{
-			res.status(200).json(result);
+			res.status(200).json({data:result, meta:{
+				"limit":limit,
+				"page":page,
+				"totalItem":totalPlaylist,
+				"totalPage":parseInt(totalPlaylist/limit)+1
+			}});
 		}
-	})
+	});
 });
 
-apiRoutesPlaylist.put("/playlist/:id", (req,res)=>{
-	var token=req.headers['authorization'];
-	var tokenDecode=jwt.decode(token);
-	var userId=tokenDecode.user.data.attributes.userId;
-
-	playlistModel.update({'data.attributes.userId':userId, 'data.attributes.playlistId':req.params.id},
-		{$set:{'data.attributes.name':req.body.name, 'data.attributes.description':req.body.description}}, 
+apiRoutesPlaylist.get("/playlist/:id", passport.authenticate('jwt', {session:false}), (req,res)=>{
+	var userId=req.user.attributes.userId;
+	playlistModel.findOne({'attributes.userId':userId,'attributes.playlistId':req.params.id},
 		function(err, result){
 		if(err){
 			res.status(500).json({
@@ -92,12 +91,42 @@ apiRoutesPlaylist.put("/playlist/:id", (req,res)=>{
 	})
 })
 
-apiRoutesPlaylist.delete("/playlist/:id", (req,res)=>{
-	var token=req.headers['authorization'];
-	var tokenDecode=jwt.decode(token);
-	var userId=tokenDecode.user.data.attributes.userId;
+apiRoutesPlaylist.put("/playlist/:id", passport.authenticate('jwt', {session:false}), (req,res)=>{
+	if(req.body.attributes.thumbnail==""){
+		var thumbnail ="https://tophinhanhdep.net/wp-content/uploads/2015/12/anh-dep-mua-xuan-3.jpg"
+	}else{
+		thumbnail=req.body.attributes.thumbnail
+	}
+	var userId=req.user.attributes.userId;
+	if(req.body.attributes.name==null||req.body.attributes.name==undefined||req.body.attributes.name.length<7||req.body.attributes.name.length==0){
+		res.status(401).json({
+			message:"Playlist name must be larger than 7 character"
+		})
+		return false;
+	}
 
-	playlistModel.remove({'data.attributes.userId':userId, 'data.attributes.playlistId':req.params.id}, function(err, result){
+	playlistModel.update({
+		'attributes.userId':userId, 
+		'attributes.playlistId':req.params.id},
+		{$set:{
+			'attributes.name':req.body.attributes.name, 
+			'attributes.description':req.body.attributes.description,
+			'attributes.thumbnail':thumbnail,
+			'attributes.updatedAt':Date.now()}}, 
+		function(err, result){
+		if(err){
+			res.status(500).json({
+				message:"Server error"
+			});
+		}else{
+			res.status(200).json(result);
+		}
+	})
+})
+
+apiRoutesPlaylist.delete("/playlist/:id", passport.authenticate('jwt', {session:false}), (req,res)=>{
+	var userId=req.user.attributes.userId;
+	playlistModel.remove({'attributes.userId':userId, 'attributes.playlistId':req.params.id}, function(err, result){
 		if(err){
 			res.status(500).json({
 				message:"Server error"
@@ -110,4 +139,4 @@ apiRoutesPlaylist.delete("/playlist/:id", (req,res)=>{
 	})
 })
 
-module.exports=apiRoutesPlaylist;
+module.exports = apiRoutesPlaylist;

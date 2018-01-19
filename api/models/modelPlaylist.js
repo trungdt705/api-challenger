@@ -3,15 +3,16 @@ var mongoose=require('mongoose');
 var Schema = mongoose.Schema;
 
 var playlistSchema=new Schema({
-	data:{
-		types:String,
-		attributes:{
-			playlistId:String,
-			name:String,
-			description:String,
-			thumbnail:String,
-			userId:String
-		}
+	types:String,
+	attributes:{
+		playlistId:String,
+		name:String,
+		description:String,
+		thumbnail:String,
+		userId:String,
+		createdAt:String,
+		updatedAt:String,
+		status:String
 	}
 })
 

@@ -1,20 +1,25 @@
 var mongoose=require('mongoose');
 var Schema= mongoose.Schema;
 var videoSchema= new Schema({
-	data:{
 		types:String,
 		attributes: {
+			videoWebsiteId:String,
 			videoId:String,
-			youtubeId: String,
 			name: String,
 			description: String,
-			keywords: String,
+			keywords: [{
+				type: String,
+				default:[]
+			}],
+			url:String,
 			playlistId: String,
 			thumbnail: String,
-			userId:String
+			userId:String,
+			createdAt:String,
+			updatedAt:String,
+			status:String
 		}
-	}
 });
 
-var modelVideo=mongoose.model('videomodel',videoSchema);
+var modelVideo=mongoose.model('videomodel', videoSchema);
 module.exports=modelVideo;
